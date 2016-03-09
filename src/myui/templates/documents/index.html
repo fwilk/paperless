@@ -1,0 +1,322 @@
+<html ng-app="paperless">
+<head>
+<title>Paperless</title>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css" integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r" crossorigin="anonymous">
+<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.5/angular.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+<style type="text/css">
+BODY { background-color: #404040; color: white;}
+IFRAME { margin:0;padding:0;border:0;}
+
+nav { background-color: #303030; margin:0;} 
+.navbar { margin-bottom:0;}
+.nopad { padding-left: 0; padding-right: 0;}
+
+A { color: white;}
+
+th { background-color: #202020; color: #c0c0c0; font-weight: normal; padding: 8px 8px; }
+td { padding: 4px 8px; border-bottom: 1px solid #353535;}
+table { cell-spacing:0; width: 100%; margin:0; padding:0; sheight: 100%; }
+.tablecontainer { position: absolute; top:0; margin-top: 50px; bottom:0; left:0; right: 0; overflow: auto;}
+.iframecontainer { position: absolute; top: 0; margin-top: 50px; bottom: 0; left: 0; right: 0;}
+.tag { font-size: 12px; margin: 4px 4px 4px 0; color: #202020; padding: 4px 8px; text-transform: uppercase; display: inline-block;}
+.tag_0 { background-color: yellow; }
+.tag_1 { background-color: yellow; }
+.tag_2 { background-color: DeepSkyBlue; }
+.tag_3 { background-color: lightBlue; }
+.tag_4 { background-color: OrangeRed ; }
+.tag_5 { background-color: Gold; }
+.tag_6 { background-color: GoldenRod; }
+.tag_7 { background-color: DarkTurquoise; }
+.tag_8 { background-color: red; }
+.tag_9 { background-color: GreenYellow; }
+.tag_10 { background-color: DeepPink; }
+.tag_11 { background-color: Fuchsia; }
+.tag_12 { background-color: DeepPink; }
+.tag_13 { background-color: Gray; }
+.active TD { background-color: #606060;}
+.fresh { background-color: #306f30;}
+.active:HOVER { background-color: #656565;}
+TR:hover { background-color: #454545;}
+tr {outline:none;}
+.right-align { text-align: right;}
+.thumb  { width: 100%;}
+.cardview { margin-top: 20px; margin-left: 20px;}
+.card { display: inline-block; width: 30%; margin-right: 15px; margin-bottom: 10px; padding: 10px;outline:none;}
+.card img {  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);}
+.card-active { background-color: #606060;}
+.card:hover { background-color: #454545;}
+.card-active:HOVER { background-color: #656565;}
+
+.nav > li > a:focus, .nav > li > a:hover {
+    text-decoration: none;
+    background-color: #202020;
+    border: 0;
+    color: white;
+}
+
+.nav .open > a, .nav .open > a:focus, .nav .open > a:hover {
+    background-color: #202020;
+    border: 0;
+    color: white;
+}
+
+</style>
+</head>
+<body ng-controller="mainctl">
+<div class="container-fluid">
+<div class="row">
+<div class="col-sm-6 nopad" style="height: 100%;">
+<nav class="navbar navbar-dark">
+  <div class="container-fluid">
+    <!-- Brand and toggle get grouped for better mobile display -->
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <span class="navbar-brand">{$data.count$} docs</span>
+    </div>
+
+    <!-- Collect the nav links, forms, and other content for toggling -->
+    <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+      <form class="navbar-form navbar-left" role="search">
+        <div class="form-group">
+          <input type="text" class="form-control" placeholder="Search">
+        </div>
+      </form>
+      <ul class="nav navbar-nav navbar-right">
+        <li class="dropdown">
+          <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">View <span class="caret"></span></a>
+          <ul class="dropdown-menu">
+            <li><a href="#" ng-click="viewmode=0">Table</a></li>
+            <li><a href="#" ng-click="viewmode=1">Cards</a></li>
+          </ul>
+        </li>
+    	<li> <a ng-click="prev()" ng-show="data.previous"><span class="glyphicon glyphicon-triangle-left"></span></a> </li>
+        <li> <a class="pull-right" ng-click="next()" ng-show="data.next"><span class="glyphicon glyphicon-triangle-right"></span></a></li>
+        
+      </ul>
+    </div><!-- /.navbar-collapse -->
+  </div><!-- /.container-fluid -->
+</nav>
+<div class="tablecontainer">
+
+<!-- TABLE VIEW -->
+
+<table ng-show="viewmode==0">
+<thead>
+<tr><th>title</th><th class="right-align">tags</th><!--<th>created</th><th>modified</th>--></tr>
+</thead>
+<tbody>
+<tr ng-repeat="row in data.results" id="i_{$row.id$}" ng-click="showpdf(row,$index)" ng-class="(row.download_url==pdf?'active':'')+' '+(newdata[row.id]?'fresh':'');" tabindex="{$$index$}" ng-keydown="key($event)"><td>
+<!--<img ng-src="{$row.thumbnail_url$}" class="thumb"/>-->
+{$row.title$}</td><td class="right-align"><span ng-repeat="tag in row.tags" class="tag" ng-class="'tag_'+fetchTag(tag).colour">{$fetchTag(tag).name$}</span></td>
+<!--<td>{$row.created$}</td><td>{$row.modified$}</td>-->
+</tr>
+</tbody>
+</table>
+
+<!-- CARD VIEW -->
+
+<div ng-show="viewmode==1" class="cardview" ng-keydown="key($event)">
+<div class="card" ng-repeat="row in data.results" ng-click="showpdf(row,$index)" id="c_{$row.id$}" ng-class="(row.download_url==pdf?'card-active':'')+' '+(newdata[row.id]?'fresh':'');" tabindex="{$$index$}">
+{$row.title$}<br/>
+<img ng-src="{$row.thumbnail_url$}" class="thumb"/><br/>
+<div ng-repeat="tag in row.tags" class="tag" ng-class="'tag_'+fetchTag(tag).colour">{$fetchTag(tag).name$}</div>
+<!--<td>{$row.created$}</td><td>{$row.modified$}</td>-->
+</div>
+</div>
+
+
+
+
+</div>
+<!--
+     {
+            "id": 25,
+            "correspondent": null,
+            "title": "2015_11_05_Steuerberater",
+            "content": "(. STEUERBERATUNG FLASNOCKER Dipl.—Kfm. (Fl-l) Marcel Flasnöcker Steuerberatung Flasnöcker, Sülzburgstr. 232„ 50937 Köln Herrn Steuerberater Florian Wilk Odenthaler Markweg l9 Sülzburgstr. 232 51467 Bergisch Gladbach 50937 Köln Telefon: 022129817840 Telefax: 022129817841 Steuerberater@ﬂasnoecker.de wwwﬂasnoeckerﬁe Datum 05.1 1.2015 Unterlagen Lieber Florian, als Anlage schicke ich dir deine Unterlagen zurück. Eine Kopie habe ich zu meinen Akten genommen. Viele Grüße MW ”1/Vlarcel Flasnöcker Steuerberater",
+            "file_type": "pdf",
+            "tags": [
+                "http://192.168.192.28:9000/api/tags/6/"
+            ],
+            "created": "2016-03-06T11:32:18Z",
+            "modified": "2016-03-07T13:03:44.812754Z",
+            "file_name": "20160306113218-2015_11_05_steuerberater.pdf",
+            "download_url": "/fetch/doc/25",
+            "thumbnail_url": "/fetch/thumb/25"
+        },
+
+-->
+
+<!--<img ng-src="{$row.thumbnail_url$}"> -->
+
+</div>
+
+<div class="col-sm-6 nopad"  style="height: 100%;">
+
+<div ng-show="pdf" >
+<nav class="navbar navbar-dark">
+  <div class="container-fluid">
+    <!-- Brand and toggle get grouped for better mobile display -->
+<!--    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+
+      <span class="navbar-brand">{$currow.title$}</span>
+    </div>-->
+    <!-- Collect the nav links, forms, and other content for toggling -->
+    <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+	  <form class="navbar-form navbar-left">
+        <div class="form-group">
+	     <input type="text" class="form-control" placeholder="add a tag" value="{$currow.title$}">
+		</div>
+		</form>	
+      <form class="navbar-form navbar-left" role="search">
+        <div class="form-group">
+	   	<span ng-repeat="tag in currow.tags" class="tag" ng-class="'tag_'+fetchTag(tag).colour">{$fetchTag(tag).name$}</span>
+          <input type="text" class="form-control" placeholder="add a tag">
+        </div>
+      </form>
+      <ul class="nav navbar-nav navbar-right">
+        <li class="dropdown">
+          <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Actions <span class="caret"></span></a>
+          <ul class="dropdown-menu">
+            <li><a href="#">Action</a></li>
+            <li><a href="#">Another action</a></li>
+            <li><a href="#">Something else here</a></li>
+            <li role="separator" class="divider"></li>
+            <li><a href="#">Separated link</a></li>
+          </ul>
+        </li>
+    	<li> <a ng-click="prevdoc()" ng-show="lastindex>0"><span class="glyphicon glyphicon-triangle-left"></span></a> </li>
+        <li> <a class="pull-right" ng-click="nextdoc()" ng-show="lastindex<data.results.length-1"><span class="glyphicon glyphicon-triangle-right"></span></a></li>
+        
+      </ul>
+    </div><!-- /.navbar-collapse -->
+  </div><!-- /.container-fluid -->
+</nav>
+
+<div class="iframecontainer">
+<iframe ng-src="{$pdf$}" width="100%" height="100%">
+</iframe>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+<script>
+
+var app = angular.module('paperless', [])
+.config(function($interpolateProvider) {
+    $interpolateProvider.startSymbol('{$');
+    $interpolateProvider.endSymbol('$}');
+});
+
+app.controller('mainctl', function ($scope,$http,$interval,$timeout) {
+        $scope.hu="HAND";
+   		$scope.firstName= "John";
+    	$scope.lastName= "Doe";
+    	$scope.pdf='';
+    	$scope.currow={};
+    	$scope.viewmode=0;
+    	$scope.lastindex=0;
+    	$scope.lasturl="";		// needed for refresh
+    	$scope.newdata={};
+    	    	
+    	$scope.refresh=function() {
+			$scope.olddata=$scope.data;
+	    	$http.get($scope.lasturl).then(function(result){ 
+	    		$scope.data=result.data; 
+	    		var allids={};
+	    		var missings=[];
+	    		console.log('checking for differences');
+	    		angular.forEach($scope.olddata.results,function(value) { 
+					allids[value.id]=true;		
+				});
+	    		angular.forEach($scope.data.results,function(value) { 
+	    			if(!allids[value.id]) 
+	    			{
+	    			$scope.newdata[value.id]=true;
+	    			}
+	    		});
+	    		console.log('refocussing #i_'+$scope.currow.id);
+	    		 $timeout(function () { 
+	    		angular.element('#i_'+$scope.currow.id).focus(true);
+	    		});
+	    	});
+    	};
+    	$interval(function() { 
+	    	$scope.refresh(); },10000);
+    	
+    	$scope.key = function($event){
+		    console.log($event.keyCode);
+		    if ($event.keyCode == 38)
+		        $scope.prevdoc();
+		    else if ($event.keyCode == 39)
+		        $scope.nextdoc();
+		    else if ($event.keyCode == 40)
+		        $scope.nextdoc();
+		    else if ($event.keyCode == 37)
+		        $scope.prevdoc();
+		};
+		
+    	$scope.next=function() {
+    		$scope.list($scope.data.next);
+    	};
+    	
+    	$scope.prev=function() {
+    		$scope.list($scope.data.previous);
+    	};
+    	$scope.nextdoc=function() {
+    		var nextindex=$scope.lastindex+1;
+    		$scope.showpdf($scope.data.results[nextindex],nextindex);
+    	};
+    	$scope.prevdoc=function() {
+    		var nextindex=$scope.lastindex-1;
+    		$scope.showpdf($scope.data.results[nextindex],nextindex);
+    	};
+    	
+    	
+    	$scope.list=function(url) {
+    		$scope.lasturl=url;
+	    	$http.get(url).then(function(result){ $scope.data=result.data; });
+    	};
+    	$scope.showpdf=function(row,i) {
+    		$scope.pdf=row.download_url;
+    		$scope.currow=row;
+    		$scope.lastindex=i;
+    		console.log('showing index '+i);
+    		if($scope.newdata[row.id]) delete $scope.newdata[row.id];
+    	};
+    	$scope.fetchTag=function(tag) {
+    		var reg= new RegExp('.*/(\\d+)/$');
+	    	var ids=reg.exec(tag);
+    		var id=ids[1];
+    		if($scope.tags[id]) return $scope.tags[id];
+    		return id;
+    	};
+    	$scope.tags={};
+
+		$http.get('/api/tags/').then(function(result) { angular.forEach(result.data.results,function(value,key) { $scope.tags[value.id]=value; });});
+    	
+    	$scope.list('/api/documents/');
+});
+
+</script>
+
+
+
+</body>
+</html>

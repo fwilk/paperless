@@ -12,8 +12,6 @@ https://docs.djangoproject.com/en/1.9/ref/settings/
 
 import os
 
-from dotenv import load_dotenv
-
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -42,7 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     "django_extensions",
-
+    "myui",
     "documents",
 
     "rest_framework",
@@ -142,16 +140,6 @@ STATIC_URL = '/static/'
 MEDIA_URL = "/media/"
 
 
-# Paperless-specific stuff
-# You shouldn't have to edit any of these values.  Rather, you can set these
-# values in /etc/paperless.conf instead.
-# ----------------------------------------------------------------------------
-
-# Tap paperless.conf if it's available
-if os.path.exists("/etc/paperless.conf"):
-    load_dotenv("/etc/paperless.conf")
-
-
 # Logging
 
 LOGGING = {
@@ -171,9 +159,13 @@ LOGGING = {
 }
 
 
+# Paperless-specific stuff
+# Change these paths if yours are different
+# ----------------------------------------------------------------------------
+
 # The default language that tesseract will attempt to use when parsing
 # documents.  It should be a 3-letter language code consistent with ISO 639.
-OCR_LANGUAGE = "eng"
+OCR_LANGUAGE = "deu"
 
 # The amount of threads to use for OCR
 OCR_THREADS = os.getenv("PAPERLESS_OCR_THREADS")
@@ -188,9 +180,6 @@ GNUPG_HOME = os.getenv("HOME", "/tmp")
 
 # Convert is part of the ImageMagick package
 CONVERT_BINARY = os.getenv("PAPERLESS_CONVERT_BINARY")
-
-# Unpaper
-UNPAPER_BINARY = os.getenv("PAPERLESS_UNPAPER_BINARY", "unpaper")
 
 # This will be created if it doesn't exist
 SCRATCH_DIR = os.getenv("PAPERLESS_SCRATCH_DIR", "/tmp/paperless")
@@ -232,7 +221,8 @@ SHARED_SECRET = os.getenv("PAPERLESS_SHARED_SECRET", "")
 # first time, you can safely ignore everything from here on, so long as you're
 # correctly defining the variables as per the documentation.
 #
-
+ # Unpaper
+UNPAPER_BINARY = os.getenv("PAPERLESS_UNPAPER_BINARY", "unpaper")
 
 def deprecated(before, after):
     print(

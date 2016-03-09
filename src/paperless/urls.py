@@ -41,7 +41,7 @@ urlpatterns = [
     url(r"^api/", include(router.urls, namespace="drf")),
 
     # Normal pages (coming soon)
-    # url(r"^$", IndexView.as_view(), name="index"),
+    url(r"^$", IndexView.as_view(), name="index"),
 
     # File downloads
     url(
