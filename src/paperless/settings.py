@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "documents",
 
     "rest_framework",
+    "crispy_forms",
 
 ]
 
