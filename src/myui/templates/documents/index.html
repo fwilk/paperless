@@ -41,6 +41,7 @@ table { cell-spacing:0; width: 100%; margin:0; padding:0; sheight: 100%; }
 .active:HOVER { background-color: #656565;}
 TR:hover { background-color: #454545;}
 tr {outline:none;}
+td.darker { color: #a0a0a0;}
 .right-align { text-align: right;}
 .thumb  { width: 100%;}
 .cardview { margin-top: 20px; margin-left: 20px;}
@@ -84,9 +85,9 @@ tr {outline:none;}
 
     <!-- Collect the nav links, forms, and other content for toggling -->
     <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-      <form class="navbar-form navbar-left" role="search">
+      <form class="navbar-form navbar-left" role="search" ng-submit="refresh()">
         <div class="form-group">
-          <input type="text" class="form-control" placeholder="Search">
+          <input type="text" class="form-control" placeholder="Search" ng-model="search">
         </div>
       </form>
       <ul class="nav navbar-nav navbar-right">
@@ -110,12 +111,16 @@ tr {outline:none;}
 
 <table ng-show="viewmode==0">
 <thead>
-<tr><th>title</th><th class="right-align">tags</th><!--<th>created</th><th>modified</th>--></tr>
+<tr><th>creation</th><th width="100%">title</th><th class="right-align">tags</th><!--<th>created</th><th>modified</th>--></tr>
 </thead>
 <tbody>
-<tr ng-repeat="row in data.results" id="i_{$row.id$}" ng-click="showpdf(row,$index)" ng-class="(row.download_url==pdf?'active':'')+' '+(newdata[row.id]?'fresh':'');" tabindex="{$$index$}" ng-keydown="key($event)"><td>
+<tr ng-repeat="row in data.results" id="i_{$row.id$}" ng-click="showpdf(row,$index)" ng-class="(row.download_url==pdf?'active':'')+' '+(newdata[row.id]?'fresh':'');" tabindex="{$$index$}" ng-keydown="key($event)">
+<td class="darker" nowrap>
+{$row.created | date:'yyyy-MM-dd'$}
+</td>
+<td>
 <!--<img ng-src="{$row.thumbnail_url$}" class="thumb"/>-->
-{$row.title$}</td><td class="right-align"><span ng-repeat="tag in row.tags" class="tag" ng-class="'tag_'+fetchTag(tag).colour">{$fetchTag(tag).name$}</span></td>
+{$row.title$}</td><td class="right-align" nowrap><span ng-repeat="tag in row.tags" class="tag" ng-class="'tag_'+fetchTag(tag).colour">{$fetchTag(tag).name$}</span></td>
 <!--<td>{$row.created$}</td><td>{$row.modified$}</td>-->
 </tr>
 </tbody>
@@ -177,9 +182,9 @@ tr {outline:none;}
     </div>-->
     <!-- Collect the nav links, forms, and other content for toggling -->
     <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-	  <form class="navbar-form navbar-left">
+	  <form class="navbar-form navbar-left" ng-submit="save()">{% csrf_token %}
         <div class="form-group">
-	     <input type="text" class="form-control" placeholder="add a tag" value="{$currow.title$}">
+	     <input type="text" class="form-control" placeholder="title" ng-model="currow.title">
 		</div>
 		</form>	
       <form class="navbar-form navbar-left" role="search">
@@ -218,10 +223,30 @@ tr {outline:none;}
 </div>
 <script>
 
+// using jQuery
+function getCookie(name) {
+    var cookieValue = null;
+    if (document.cookie && document.cookie != '') {
+        var cookies = document.cookie.split(';');
+        for (var i = 0; i < cookies.length; i++) {
+            var cookie = jQuery.trim(cookies[i]);
+            // Does this cookie string begin with the name we want?
+            if (cookie.substring(0, name.length + 1) == (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+var csrftoken = getCookie('csrftoken');
+
 var app = angular.module('paperless', [])
-.config(function($interpolateProvider) {
+.config(function($interpolateProvider,$httpProvider) {
     $interpolateProvider.startSymbol('{$');
     $interpolateProvider.endSymbol('$}');
+    $httpProvider.defaults.xsrfCookieName = 'csrftoken';
+    $httpProvider.defaults.xsrfHeaderName = 'X-CSRFToken';
 });
 
 app.controller('mainctl', function ($scope,$http,$interval,$timeout) {
@@ -234,31 +259,19 @@ app.controller('mainctl', function ($scope,$http,$interval,$timeout) {
     	$scope.lastindex=0;
     	$scope.lasturl="";		// needed for refresh
     	$scope.newdata={};
+        $scope.search='';
     	    	
+        $scope.save=function() {
+            $http.put('/api/documents/'+$scope.currow.id+'/',$scope.currow);
+            $scope.nextdoc();
+        };
+
     	$scope.refresh=function() {
 			$scope.olddata=$scope.data;
-	    	$http.get($scope.lasturl).then(function(result){ 
+	    	$http.get($scope.lasturl+($scope.search?('?search='+$scope.search):'')).then(function(result){ 
 	    		$scope.data=result.data; 
-	    		var allids={};
-	    		var missings=[];
-	    		console.log('checking for differences');
-	    		angular.forEach($scope.olddata.results,function(value) { 
-					allids[value.id]=true;		
-				});
-	    		angular.forEach($scope.data.results,function(value) { 
-	    			if(!allids[value.id]) 
-	    			{
-	    			$scope.newdata[value.id]=true;
-	    			}
-	    		});
-	    		console.log('refocussing #i_'+$scope.currow.id);
-	    		 $timeout(function () { 
-	    		angular.element('#i_'+$scope.currow.id).focus(true);
-	    		});
 	    	});
     	};
-    	$interval(function() { 
-	    	$scope.refresh(); },10000);
     	
     	$scope.key = function($event){
 		    console.log($event.keyCode);
