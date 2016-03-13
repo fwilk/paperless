@@ -50,7 +50,7 @@ td.darker { color: #a0a0a0;}
 .card-active { background-color: #606060;}
 .card:hover { background-color: #454545;}
 .card-active:HOVER { background-color: #656565;}
-
+.card .tags { height: 80px;}
 .nav > li > a:focus, .nav > li > a:hover {
     text-decoration: none;
     background-color: #202020;
@@ -132,11 +132,13 @@ td.darker { color: #a0a0a0;}
 <div class="card" ng-repeat="row in data.results" ng-click="showpdf(row,$index)" id="c_{$row.id$}" ng-class="(row.download_url==pdf?'card-active':'')+' '+(newdata[row.id]?'fresh':'');" tabindex="{$$index$}">
 {$row.title$}<br/>
 <img ng-src="{$row.thumbnail_url$}" class="thumb"/><br/>
+<div class="tags">
 <div ng-repeat="tag in row.tags" class="tag" ng-class="'tag_'+fetchTag(tag).colour">{$fetchTag(tag).name$}</div>
 <!--<td>{$row.created$}</td><td>{$row.modified$}</td>-->
+&nbsp;
 </div>
 </div>
-
+</div>
 
 
 
