@@ -13,7 +13,7 @@ from rest_framework.viewsets import (
 
 from paperless.db import GnuPG
 
-from .filters import DocumentFilter, CorrespondentFilter, TagFilter
+from .filters import DocumentFilterSet, CorrespondentFilterSet, TagFilterSet
 from .forms import UploadForm
 from .models import Correspondent, Tag, Document, Log
 from .serialisers import (
@@ -96,8 +96,9 @@ class CorrespondentViewSet(ModelViewSet):
     serializer_class = CorrespondentSerializer
     pagination_class = StandardPagination
     permission_classes = (IsAuthenticated,)
-    filter_backends = (filters.DjangoFilterBackend,)
-    filter_class = CorrespondentFilter
+    filter_backends = (filters.DjangoFilterBackend, filters.OrderingFilter)
+    filter_class = CorrespondentFilterSet
+    ordering_fields = ("name", "slug")
 
 
 class TagViewSet(ModelViewSet):
@@ -106,8 +107,9 @@ class TagViewSet(ModelViewSet):
     serializer_class = TagSerializer
     pagination_class = StandardPagination
     permission_classes = (IsAuthenticated,)
-    filter_backends = (filters.DjangoFilterBackend,)
-    filter_class = TagFilter
+    filter_backends = (filters.DjangoFilterBackend, filters.OrderingFilter)
+    filter_class = TagFilterSet
+    ordering_fields = ("name", "slug")
 
 
 class DocumentViewSet(RetrieveModelMixin,
@@ -120,9 +122,14 @@ class DocumentViewSet(RetrieveModelMixin,
     serializer_class = DocumentSerializer
     pagination_class = StandardPagination
     permission_classes = (IsAuthenticated,)
-    filter_backends = (filters.DjangoFilterBackend, filters.SearchFilter)
-    filter_class = DocumentFilter
+    filter_backends = (
+        filters.DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter
+    )
+    filter_class = DocumentFilterSet
     search_fields = ("title", "correspondent__name", "content")
+    ordering_fields = ("id", "title", "correspondent__name")
 
 
 class LogViewSet(ReadOnlyModelViewSet):
@@ -131,4 +138,5 @@ class LogViewSet(ReadOnlyModelViewSet):
     serializer_class = LogSerializer
     pagination_class = StandardPagination
     permission_classes = (IsAuthenticated,)
-    filter_backends = (filters.DjangoFilterBackend,)
+    filter_backends = (filters.DjangoFilterBackend, filters.OrderingFilter)
+    ordering_fields = ("time",)
