@@ -85,7 +85,7 @@ td.darker { color: #a0a0a0;}
 
     <!-- Collect the nav links, forms, and other content for toggling -->
     <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-      <form class="navbar-form navbar-left" role="search" ng-submit="refresh()">
+      <form class="navbar-form navbar-left" role="search" ng-submit="search()">
         <div class="form-group">
           <input type="text" class="form-control" placeholder="Search" ng-model="search">
         </div>
@@ -270,7 +270,7 @@ app.controller('mainctl', function ($scope,$http,$interval,$timeout) {
 
     	$scope.refresh=function() {
 			$scope.olddata=$scope.data;
-	    	$http.get($scope.lasturl+($scope.search?('?search='+$scope.search):'')).then(function(result){ 
+	    	$http.get($scope.lasturl).then(function(result){ 
 	    		$scope.data=result.data; 
 	    	});
     	};
@@ -306,7 +306,7 @@ app.controller('mainctl', function ($scope,$http,$interval,$timeout) {
     	
     	$scope.list=function(url) {
     		$scope.lasturl=url;
-	    	$http.get(url).then(function(result){ $scope.data=result.data; });
+            $scope.refresh();
     	};
     	$scope.showpdf=function(row,i) {
     		$scope.pdf=row.download_url;
@@ -326,7 +326,10 @@ app.controller('mainctl', function ($scope,$http,$interval,$timeout) {
 
 		$http.get('/api/tags/').then(function(result) { angular.forEach(result.data.results,function(value,key) { $scope.tags[value.id]=value; });});
     	
-    	$scope.list('/api/documents/');
+    	$scope.list('/api/documents/?ordering=-title');
+        $scope.search=function() {
+            $scope.list('/api/documents/?ordering=-title&search='+($scope.search?('&search='+$scope.search):''));
+        };
 });
 
 </script>
