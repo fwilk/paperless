@@ -3,9 +3,8 @@
 <title>Paperless</title>
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css" integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r" crossorigin="anonymous">
 <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
-<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.5/angular.min.js"></script>
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/angular_material/0.11.2/angular-material.min.css">
+
 <style type="text/css">
 BODY { background-color: #404040; color: white;}
 IFRAME { margin:0;padding:0;border:0;}
@@ -85,7 +84,7 @@ td.darker { color: #a0a0a0;}
 
     <!-- Collect the nav links, forms, and other content for toggling -->
     <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-      <form class="navbar-form navbar-left" role="search" ng-submit="search()">
+      <form class="navbar-form navbar-left" role="search" ng-submit="dosearch()">
         <div class="form-group">
           <input type="text" class="form-control" placeholder="Search" ng-model="search">
         </div>
@@ -186,6 +185,7 @@ td.darker { color: #a0a0a0;}
     <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
 	  <form class="navbar-form navbar-left" ng-submit="save()">{% csrf_token %}
         <div class="form-group">
+         <input  type="date" ng-model="created" class="form-control" >
 	     <input type="text" class="form-control" placeholder="title" ng-model="currow.title">
 		</div>
 		</form>	
@@ -199,11 +199,9 @@ td.darker { color: #a0a0a0;}
         <li class="dropdown">
           <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Actions <span class="caret"></span></a>
           <ul class="dropdown-menu">
-            <li><a href="#">Action</a></li>
-            <li><a href="#">Another action</a></li>
-            <li><a href="#">Something else here</a></li>
+            <li><a href="#">Merge document with other</a></li>
             <li role="separator" class="divider"></li>
-            <li><a href="#">Separated link</a></li>
+            <li><a href="#">Delete document</a></li>
           </ul>
         </li>
     	<li> <a ng-click="prevdoc()" ng-show="lastindex>0"><span class="glyphicon glyphicon-triangle-left"></span></a> </li>
@@ -223,6 +221,16 @@ td.darker { color: #a0a0a0;}
 </div>
 </div>
 </div>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.5/angular.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.5/angular-animate.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.5/angular-aria.min.js"></script>
+
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+
+<script src="https://ajax.googleapis.com/ajax/libs/angular_material/0.11.2/angular-material.min.js"></script>
+  
 <script>
 
 // using jQuery
@@ -251,7 +259,7 @@ var app = angular.module('paperless', [])
     $httpProvider.defaults.xsrfHeaderName = 'X-CSRFToken';
 });
 
-app.controller('mainctl', function ($scope,$http,$interval,$timeout) {
+app.controller('mainctl', function ($scope,$http,$interval,$timeout,$filter) {
         $scope.hu="HAND";
    		$scope.firstName= "John";
     	$scope.lastName= "Doe";
@@ -264,6 +272,7 @@ app.controller('mainctl', function ($scope,$http,$interval,$timeout) {
         $scope.search='';
     	    	
         $scope.save=function() {
+            $scope.currow.created=$filter('date')($scope.created,'yyyy-MM-ddTHH:mm:ss\Z');
             $http.put('/api/documents/'+$scope.currow.id+'/',$scope.currow);
             $scope.nextdoc();
         };
@@ -311,6 +320,7 @@ app.controller('mainctl', function ($scope,$http,$interval,$timeout) {
     	$scope.showpdf=function(row,i) {
     		$scope.pdf=row.download_url;
     		$scope.currow=row;
+            $scope.created=new Date(row.created);
     		$scope.lastindex=i;
     		console.log('showing index '+i);
     		if($scope.newdata[row.id]) delete $scope.newdata[row.id];
@@ -327,14 +337,12 @@ app.controller('mainctl', function ($scope,$http,$interval,$timeout) {
 		$http.get('/api/tags/').then(function(result) { angular.forEach(result.data.results,function(value,key) { $scope.tags[value.id]=value; });});
     	
     	$scope.list('/api/documents/?ordering=-title');
-        $scope.search=function() {
+        $scope.dosearch=function() {
             $scope.list('/api/documents/?ordering=-title&search='+($scope.search?('&search='+$scope.search):''));
         };
 });
 
 </script>
-
-
 
 </body>
 </html>
