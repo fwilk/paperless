@@ -1,7 +1,10 @@
+import dateutil.parser
 import logging
 import os
 import re
 import uuid
+
+from collections import OrderedDict
 
 from django.conf import settings
 from django.core.urlresolvers import reverse
@@ -12,50 +15,7 @@ from django.utils import timezone
 from .managers import LogManager
 
 
-class SluggedModel(models.Model):
-
-    name = models.CharField(max_length=128, unique=True)
-    slug = models.SlugField(blank=True)
-
-    class Meta(object):
-        abstract = True
-
-    def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = slugify(self.name)
-        models.Model.save(self, *args, **kwargs)
-
-    def __str__(self):
-        return self.name
-
-
-class Correspondent(SluggedModel):
-
-    # This regex is probably more restrictive than it needs to be, but it's
-    # better safe than sorry.
-    SAFE_REGEX = re.compile(r"^[\w\- ,.']+$")
-
-    class Meta(object):
-        ordering = ("name",)
-
-
-class Tag(SluggedModel):
-
-    COLOURS = (
-        (1, "#a6cee3"),
-        (2, "#1f78b4"),
-        (3, "#b2df8a"),
-        (4, "#33a02c"),
-        (5, "#fb9a99"),
-        (6, "#e31a1c"),
-        (7, "#fdbf6f"),
-        (8, "#ff7f00"),
-        (9, "#cab2d6"),
-        (10, "#6a3d9a"),
-        (11, "#b15928"),
-        (12, "#000000"),
-        (13, "#cccccc")
-    )
+class MatchingModel(models.Model):
 
     MATCH_ANY = 1
     MATCH_ALL = 2
@@ -68,7 +28,9 @@ class Tag(SluggedModel):
         (MATCH_REGEX, "Regular Expression"),
     )
 
-    colour = models.PositiveIntegerField(choices=COLOURS, default=1)
+    name = models.CharField(max_length=128, unique=True)
+    slug = models.SlugField(blank=True)
+
     match = models.CharField(max_length=256, blank=True)
     matching_algorithm = models.PositiveIntegerField(
         choices=MATCHING_ALGORITHMS,
@@ -84,6 +46,12 @@ class Tag(SluggedModel):
             "is, you probably don't want this option."
         )
     )
+
+    class Meta(object):
+        abstract = True
+
+    def __str__(self):
+        return self.name
 
     @property
     def conditions(self):
@@ -128,8 +96,44 @@ class Tag(SluggedModel):
         raise NotImplementedError("Unsupported matching algorithm")
 
     def save(self, *args, **kwargs):
+
         self.match = self.match.lower()
-        SluggedModel.save(self, *args, **kwargs)
+
+        if not self.slug:
+            self.slug = slugify(self.name)
+
+        models.Model.save(self, *args, **kwargs)
+
+
+class Correspondent(MatchingModel):
+
+    # This regex is probably more restrictive than it needs to be, but it's
+    # better safe than sorry.
+    SAFE_REGEX = re.compile(r"^[\w\- ,.']+$")
+
+    class Meta(object):
+        ordering = ("name",)
+
+
+class Tag(MatchingModel):
+
+    COLOURS = (
+        (1, "#a6cee3"),
+        (2, "#1f78b4"),
+        (3, "#b2df8a"),
+        (4, "#33a02c"),
+        (5, "#fb9a99"),
+        (6, "#e31a1c"),
+        (7, "#fdbf6f"),
+        (8, "#ff7f00"),
+        (9, "#cab2d6"),
+        (10, "#6a3d9a"),
+        (11, "#b15928"),
+        (12, "#000000"),
+        (13, "#cccccc")
+    )
+
+    colour = models.PositiveIntegerField(choices=COLOURS, default=1)
 
 
 class Document(models.Model):
@@ -152,8 +156,20 @@ class Document(models.Model):
     )
     tags = models.ManyToManyField(
         Tag, related_name="documents", blank=True)
-    created = models.DateTimeField(default=timezone.now, editable=False)
-    modified = models.DateTimeField(auto_now=True, editable=False)
+
+    checksum = models.CharField(
+        max_length=32,
+        editable=False,
+        unique=True,
+        help_text="The checksum of the original document (before it was "
+                  "encrypted).  We use this to prevent duplicate document "
+                  "imports."
+    )
+
+    created = models.DateTimeField(
+        default=timezone.now, db_index=True)
+    modified = models.DateTimeField(
+        auto_now=True, editable=False, db_index=True)
 
     class Meta(object):
         ordering = ("correspondent", "title")
@@ -216,17 +232,9 @@ class Log(models.Model):
         (logging.CRITICAL, "Critical"),
     )
 
-    COMPONENT_CONSUMER = 1
-    COMPONENT_MAIL = 2
-    COMPONENTS = (
-        (COMPONENT_CONSUMER, "Consumer"),
-        (COMPONENT_MAIL, "Mail Fetcher")
-    )
-
     group = models.UUIDField(blank=True)
     message = models.TextField()
     level = models.PositiveIntegerField(choices=LEVELS, default=logging.INFO)
-    component = models.PositiveIntegerField(choices=COMPONENTS)
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
 
@@ -250,3 +258,136 @@ class Log(models.Model):
             self.group = uuid.uuid4()
 
         models.Model.save(self, *args, **kwargs)
+
+
+class FileInfo(object):
+
+    # This epic regex *almost* worked for our needs, so I'm keeping it here for
+    # posterity, in the hopes that we might find a way to make it work one day.
+    ALMOST_REGEX = re.compile(
+        r"^((?P<date>\d\d\d\d\d\d\d\d\d\d\d\d\d\dZ){separator})?"
+        r"((?P<correspondent>{non_separated_word}+){separator})??"
+        r"(?P<title>{non_separated_word}+)"
+        r"({separator}(?P<tags>[a-z,0-9-]+))?"
+        r"\.(?P<extension>[a-zA-Z.-]+)$".format(
+            separator=r"\s+-\s+",
+            non_separated_word=r"([\w,. ]|([^\s]-))"
+        )
+    )
+
+    REGEXES = OrderedDict([
+        ("created-correspondent-title-tags", re.compile(
+            r"^(?P<created>\d\d\d\d\d\d\d\d(\d\d\d\d\d\d)?Z) - "
+            r"(?P<correspondent>.*) - "
+            r"(?P<title>.*) - "
+            r"(?P<tags>[a-z0-9\-,]*)"
+            r"\.(?P<extension>pdf|jpe?g|png|gif|tiff)$",
+            flags=re.IGNORECASE
+        )),
+        ("created-title-tags", re.compile(
+            r"^(?P<created>\d\d\d\d\d\d\d\d(\d\d\d\d\d\d)?Z) - "
+            r"(?P<title>.*) - "
+            r"(?P<tags>[a-z0-9\-,]*)"
+            r"\.(?P<extension>pdf|jpe?g|png|gif|tiff)$",
+            flags=re.IGNORECASE
+        )),
+        ("created-correspondent-title", re.compile(
+            r"^(?P<created>\d\d\d\d\d\d\d\d(\d\d\d\d\d\d)?Z) - "
+            r"(?P<correspondent>.*) - "
+            r"(?P<title>.*)"
+            r"\.(?P<extension>pdf|jpe?g|png|gif|tiff)$",
+            flags=re.IGNORECASE
+        )),
+        ("created-title", re.compile(
+            r"^(?P<created>\d\d\d\d\d\d\d\d(\d\d\d\d\d\d)?Z) - "
+            r"(?P<title>.*)"
+            r"\.(?P<extension>pdf|jpe?g|png|gif|tiff)$",
+            flags=re.IGNORECASE
+        )),
+        ("correspondent-title-tags", re.compile(
+            r"(?P<correspondent>.*) - "
+            r"(?P<title>.*) - "
+            r"(?P<tags>[a-z0-9\-,]*)"
+            r"\.(?P<extension>pdf|jpe?g|png|gif|tiff)$",
+            flags=re.IGNORECASE
+        )),
+        ("correspondent-title", re.compile(
+            r"(?P<correspondent>.*) - "
+            r"(?P<title>.*)?"
+            r"\.(?P<extension>pdf|jpe?g|png|gif|tiff)$",
+            flags=re.IGNORECASE
+        )),
+        ("title", re.compile(
+            r"(?P<title>.*)"
+            r"\.(?P<extension>pdf|jpe?g|png|gif|tiff)$",
+            flags=re.IGNORECASE
+        ))
+    ])
+
+    def __init__(self, created=None, correspondent=None, title=None, tags=(),
+                 extension=None):
+
+        self.created = created
+        self.title = title
+        self.extension = extension
+        self.correspondent = correspondent
+        self.tags = tags
+
+    @classmethod
+    def _get_created(cls, created):
+        return dateutil.parser.parse("{:0<14}Z".format(created[:-1]))
+
+    @classmethod
+    def _get_correspondent(cls, name):
+        if not name:
+            return None
+        return Correspondent.objects.get_or_create(name=name, defaults={
+            "slug": slugify(name)
+        })[0]
+
+    @classmethod
+    def _get_title(cls, title):
+        return title
+
+    @classmethod
+    def _get_tags(cls, tags):
+        r = []
+        for t in tags.split(","):
+            r.append(
+                Tag.objects.get_or_create(slug=t, defaults={"name": t})[0])
+        return tuple(r)
+
+    @classmethod
+    def _get_extension(cls, extension):
+        r = extension.lower()
+        if r == "jpeg":
+            return "jpg"
+        return r
+
+    @classmethod
+    def _mangle_property(cls, properties, name):
+        if name in properties:
+            properties[name] = getattr(cls, "_get_{}".format(name))(
+                properties[name]
+            )
+
+    @classmethod
+    def from_path(cls, path):
+        """
+        We use a crude naming convention to make handling the correspondent,
+        title, and tags easier:
+          "<correspondent> - <title> - <tags>.<suffix>"
+          "<correspondent> - <title>.<suffix>"
+          "<title>.<suffix>"
+        """
+
+        for regex in cls.REGEXES.values():
+            m = regex.match(os.path.basename(path))
+            if m:
+                properties = m.groupdict()
+                cls._mangle_property(properties, "created")
+                cls._mangle_property(properties, "correspondent")
+                cls._mangle_property(properties, "title")
+                cls._mangle_property(properties, "tags")
+                cls._mangle_property(properties, "extension")
+                return cls(**properties)

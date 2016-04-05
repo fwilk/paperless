@@ -3,7 +3,7 @@
 Consumption
 ###########
 
-Once you've got *Paperless* setup, you need to start feeding documents into it.
+Once you've got Paperless setup, you need to start feeding documents into it.
 Currently, there are three options: the consumption directory, IMAP (email), and
 HTTP POST.
 
@@ -19,7 +19,7 @@ loop looking for new additions to this directory and when it finds them, it goes
 about the process of parsing them with the OCR, indexing what it finds, and
 encrypting the PDF, storing it in the media directory.
 
-Getting stuff into this directory is up to you.  If you're running *Paperless*
+Getting stuff into this directory is up to you.  If you're running Paperless
 on your local computer, you might just want to drag and drop files there, but if
 you're running this on a server and want your scanner to automatically push
 files to this directory, you'll need to setup some sort of service to accept the
@@ -35,31 +35,47 @@ appropriate for your use and put some documents in there.  When you're ready,
 follow the :ref:`consumer <utilities-consumer>` instructions to get it running.
 
 
-.. _consumption-directory-naming:
+.. _consumption-directory-hook:
 
-A Note on File Naming
----------------------
+Hooking into the Consumption Process
+------------------------------------
 
-Any document you put into the consumption directory will be consumed, but if
-you name the file right, it'll automatically set some values in the database
-for you.  This is is the logic the consumer follows:
+Sometimes you may want to do something arbitrary whenever a document is
+consumed.  Rather than try to predict what you may want to do, Paperless lets
+you execute a script of your own choosing every time a document is consumed.
 
-1. Try to find the correspondent, title, and tags in the file name following
-   the pattern: ``Correspondent - Title - tag,tag,tag.pdf``.
-2. If that doesn't work, try to find the correspondent and title in the file
-   name following the pattern:  ``Correspondent - Title.pdf``.
-3. If that doesn't work, just assume that the name of the file is the title.
+Just write a script, put it somewhere that Paperless can read & execute, and
+then put the path to that script in ``paperless.conf`` with the variable name
+``PAPERLESS_POST_CONSUME_SCRIPT``.
 
-So given the above, the following examples would work as you'd expect:
+.. important::
 
-* ``Some Company Name - Invoice 2016-01-01 - money,invoices.pdf``
-* ``Another Company - Letter of Reference.jpg``
-* ``Dad's Recipe for Pancakes.png``
+    This script is executed in a **blocking** process, which means that if the
+    script takes a long time to run, it can significantly slow down your
+    document consumption flow.  If you want things to run asynchronously,
+    you'll have to fork the process in your script and exit.
 
-These however wouldn't work:
 
-* ``Some Company Name, Invoice 2016-01-01, money, invoices.pdf``
-* ``Another Company- Letter of Reference.jpg``
+.. _consumption-directory-hook-variables
+
+What Can This Script Do?
+........................
+
+It's your script, so you're only limited by your imagination and the laws of
+physics.  However, the following values are passed to the script in order:
+
+* Document id
+* Generated file name
+* Source path
+* Thumbnail path
+* Download URL
+* Thumbnail URL
+* Correspondent
+* Tags
+
+The script can be in any language you like, but for a simple shell script
+example, you can take a look at ``post-consumption-example.sh`` in the
+``scripts`` directory in this project.
 
 
 .. _consumption-imap:
@@ -69,7 +85,7 @@ IMAP (Email)
 
 Another handy way to get documents into your database is to email them to
 yourself.  The typical use-case would be to be out for lunch and want to send a
-copy of the receipt back to your system at home.  *Paperless* can be taught to
+copy of the receipt back to your system at home.  Paperless can be taught to
 pull emails down from an arbitrary account and dump them into the consumption
 directory where the process :ref:`above <consumption-directory>` will follow the
 usual pattern on consuming the document.
@@ -128,7 +144,7 @@ following name/value pairs:
   don't start uploading stuff to your server.  The means of generating this
   signature is defined below.
 
-Specify ``enctype="multipart/form-data"``, and then POST your file with:::
+Specify ``enctype="multipart/form-data"``, and then POST your file with::
 
     Content-Disposition: form-data; name="document"; filename="whatever.pdf"
 
@@ -143,7 +159,7 @@ and store it on the server and the client.  Then use that secret, along with
 the text you want to verify to generate a string that you can use for
 verification.
 
-In the case of *Paperless*, you configure the server with the secret by setting
+In the case of Paperless, you configure the server with the secret by setting
 ``UPLOAD_SHARED_SECRET``.  Then on your client, you generate your signature by
 concatenating the correspondent, title, and the secret, and then using sha256
 to generate a hexdigest.

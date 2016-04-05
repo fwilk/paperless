@@ -42,7 +42,7 @@ INSTALLED_APPS = [
     "django_extensions",
     "myui",
     "documents",
-
+    "documents.apps.DocumentsConfig",
     "rest_framework",
     "crispy_forms",
 
@@ -181,6 +181,8 @@ GNUPG_HOME = os.getenv("HOME", "/tmp")
 
 # Convert is part of the ImageMagick package
 CONVERT_BINARY = os.getenv("PAPERLESS_CONVERT_BINARY")
+CONVERT_TMPDIR = os.getenv("PAPERLESS_CONVERT_TMPDIR")
+CONVERT_MEMORY_LIMIT = os.getenv("PAPERLESS_CONVERT_MEMORY_LIMIT")
 
 # This will be created if it doesn't exist
 SCRATCH_DIR = os.getenv("PAPERLESS_SCRATCH_DIR", "/tmp/paperless")
@@ -214,8 +216,11 @@ PASSPHRASE = os.getenv("PAPERLESS_PASSPHRASE")
 # the API.
 SHARED_SECRET = os.getenv("PAPERLESS_SHARED_SECRET", "")
 
+# Trigger a script after every successful document consumption?
+POST_CONSUME_SCRIPT = os.getenv("PAPERLESS_POST_CONSUME_SCRIPT")
+
 #
-# TODO: Remove after 1.2
+# TODO: Remove after 0.2
 #
 # This logic is here to address issue #44, wherein we were using inconsistent
 # constant names vs. environment variables.  If you're using Paperless for the

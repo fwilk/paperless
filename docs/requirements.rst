@@ -8,7 +8,7 @@ should work) that has the following software installed on it:
 
 * `Python3`_ (with development libraries, pip and virtualenv)
 * `GNU Privacy Guard`_
-* `Tesseract`_
+* `Tesseract`_, plus its language files matching your document base.
 * `Imagemagick`_
 * `unpaper`_
 
@@ -52,6 +52,7 @@ well as ImageMagick:
 
     $ brew install ghostscript
     $ brew install imagemagick
+    $ brew install libmagic
 
 
 .. _requirements-baremetal:
@@ -86,7 +87,7 @@ enter it, and install the requirements using the ``requirements.txt`` file:
     $ pip install  --requirement /path/to/paperless/requirements.txt
 
 Now you're ready to go.  Just remember to enter your virtualenv whenever you
-want to use *Paperless*.
+want to use Paperless.
 
 
 .. _requirements-documentation:
@@ -94,7 +95,7 @@ want to use *Paperless*.
 Documentation
 -------------
 
-As generation of the documentation is not required for use of *Paperless*,
+As generation of the documentation is not required for use of Paperless,
 dependencies for this process are not included in ``requirements.txt``.  If
 you'd like to generate your own docs locally, you'll need to:
 

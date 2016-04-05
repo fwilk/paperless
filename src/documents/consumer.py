@@ -1,4 +1,5 @@
 import datetime
+import hashlib
 import logging
 import tempfile
 import uuid
@@ -19,13 +20,14 @@ from PIL import Image
 
 from django.conf import settings
 from django.utils import timezone
-from django.template.defaultfilters import slugify
 from pyocr.tesseract import TesseractError
 
 from paperless.db import GnuPG
 
-from .models import Correspondent, Tag, Document, Log
+from .models import Tag, Document, FileInfo
 from .languages import ISO639
+from .signals import (
+    document_consumption_started, document_consumption_finished)
 
 
 class OCRError(Exception):
@@ -54,19 +56,6 @@ class Consumer(object):
 
     DEFAULT_OCR_LANGUAGE = settings.OCR_LANGUAGE
 
-    REGEX_TITLE = re.compile(
-        r"^.*/(.*)\.(pdf|jpe?g|png|gif|tiff)$",
-        flags=re.IGNORECASE
-    )
-    REGEX_CORRESPONDENT_TITLE = re.compile(
-        r"^.*/(.+) - (.*)\.(pdf|jpe?g|png|gif|tiff)$",
-        flags=re.IGNORECASE
-    )
-    REGEX_CORRESPONDENT_TITLE_TAGS = re.compile(
-        r"^.*/(.*) - (.*) - ([a-z0-9\-,]*)\.(pdf|jpe?g|png|gif|tiff)$",
-        flags=re.IGNORECASE
-    )
-
     def __init__(self):
 
         self.logger = logging.getLogger(__name__)
@@ -92,8 +81,7 @@ class Consumer(object):
 
     def log(self, level, message):
         getattr(self.logger, level)(message, extra={
-            "group": self.logging_group,
-            "component": Log.COMPONENT_CONSUMER
+            "group": self.logging_group
         })
 
     def consume(self):
@@ -105,7 +93,7 @@ class Consumer(object):
             if not os.path.isfile(doc):
                 continue
 
-            if not re.match(self.REGEX_TITLE, doc):
+            if not re.match(FileInfo.REGEXES["title"], doc):
                 continue
 
             if doc in self._ignore:
@@ -114,25 +102,50 @@ class Consumer(object):
             if self._is_ready(doc):
                 continue
 
+            if self._is_duplicate(doc):
+                self.log(
+                    "info",
+                    "Skipping {} as it appears to be a duplicate".format(doc)
+                )
+                self._ignore.append(doc)
+                continue
+
             self.logging_group = uuid.uuid4()
 
             self.log("info", "Consuming {}".format(doc))
+
+            document_consumption_started.send(
+                sender=self.__class__,
+                filename=doc,
+                logging_group=self.logging_group
+            )
 
             tempdir = tempfile.mkdtemp(prefix="paperless", dir=self.SCRATCH)
             imgs = self._get_greyscale(tempdir, doc)
             thumbnail = self._get_thumbnail(tempdir, doc)
 
             try:
-                text = self._get_ocr(imgs)
-                self._store(text, doc, thumbnail)
+
+                document = self._store(self._get_ocr(imgs), doc, thumbnail)
+
             except OCRError as e:
+
                 self._ignore.append(doc)
                 self.log("error", "OCR FAILURE for {}: {}".format(doc, e))
                 self._cleanup_tempdir(tempdir)
+
                 continue
+
             else:
+
                 self._cleanup_tempdir(tempdir)
                 self._cleanup_doc(doc)
+
+                document_consumption_finished.send(
+                    sender=self.__class__,
+                    document=document,
+                    logging_group=self.logging_group
+                )
 
     def _get_greyscale(self, tempdir, doc):
         """
@@ -143,10 +156,13 @@ class Consumer(object):
 
         # Convert PDF to multiple PNMs
         pnm = os.path.join(tempdir, "convert-%04d.pnm")
-        subprocess.Popen((
-            self.CONVERT, "-density", "300", "-depth", "8",
-            "-type", "grayscale", doc, pnm
-        )).wait()
+        run_convert(
+            self.CONVERT,
+            "-density", "300",
+            "-depth", "8",
+            "-type", "grayscale",
+            doc, pnm,
+        )
 
         # Get a list of converted images
         pnms = []
@@ -173,13 +189,12 @@ class Consumer(object):
 
         self.log("info", "Generating the thumbnail")
 
-        subprocess.Popen((
+        run_convert(
             self.CONVERT,
             "-scale", "500x5000",
             "-alpha", "remove",
-            doc,
-            os.path.join(tempdir, "convert-%04d.png")
-        )).wait()
+            doc, os.path.join(tempdir, "convert-%04d.png")
+        )
 
         return os.path.join(tempdir, "convert-0000.png")
 
@@ -269,78 +284,26 @@ class Consumer(object):
         # Strip out excess white space to allow matching to go smoother
         return re.sub(r"\s+", " ", r)
 
-    def _guess_attributes_from_name(self, parseable):
-        """
-        We use a crude naming convention to make handling the correspondent,
-        title, and tags easier:
-          "<correspondent> - <title> - <tags>.<suffix>"
-          "<correspondent> - <title>.<suffix>"
-          "<title>.<suffix>"
-        """
-
-        def get_correspondent(correspondent_name):
-            return Correspondent.objects.get_or_create(
-                name=correspondent_name,
-                defaults={"slug": slugify(correspondent_name)}
-            )[0]
-
-        def get_tags(tags):
-            r = []
-            for t in tags.split(","):
-                r.append(
-                    Tag.objects.get_or_create(slug=t, defaults={"name": t})[0])
-            return tuple(r)
-
-        def get_suffix(suffix):
-            suffix = suffix.lower()
-            if suffix == "jpeg":
-                return "jpg"
-            return suffix
-
-        # First attempt: "<correspondent> - <title> - <tags>.<suffix>"
-        m = re.match(self.REGEX_CORRESPONDENT_TITLE_TAGS, parseable)
-        if m:
-            return (
-                get_correspondent(m.group(1)),
-                m.group(2),
-                get_tags(m.group(3)),
-                get_suffix(m.group(4))
-            )
-
-        # Second attempt: "<correspondent> - <title>.<suffix>"
-        m = re.match(self.REGEX_CORRESPONDENT_TITLE, parseable)
-        if m:
-            return (
-                get_correspondent(m.group(1)),
-                m.group(2),
-                (),
-                get_suffix(m.group(3))
-            )
-
-        # That didn't work, so we assume correspondent and tags are None
-        m = re.match(self.REGEX_TITLE, parseable)
-        return None, m.group(1), (), get_suffix(m.group(2))
-
     def _store(self, text, doc, thumbnail):
 
-        sender, title, tags, file_type = self._guess_attributes_from_name(doc)
-        relevant_tags = set(list(Tag.match_all(text)) + list(tags))
+        file_info = FileInfo.from_path(doc)
 
         stats = os.stat(doc)
 
         self.log("debug", "Saving record to database")
 
         document = Document.objects.create(
-            correspondent=sender,
-            title=title,
+            correspondent=file_info.correspondent,
+            title=file_info.title,
             content=text,
-            file_type=file_type,
+            file_type=file_info.extension,
             created=timezone.make_aware(
                 datetime.datetime.fromtimestamp(stats.st_mtime)),
             modified=timezone.make_aware(
                 datetime.datetime.fromtimestamp(stats.st_mtime))
         )
 
+        relevant_tags = set(list(Tag.match_all(text)) + list(file_info.tags))
         if relevant_tags:
             tag_names = ", ".join([t.slug for t in relevant_tags])
             self.log("debug", "Tagging with {}".format(tag_names))
@@ -359,6 +322,8 @@ class Consumer(object):
                 encrypted.write(GnuPG.encrypted(unencrypted))
 
         self.log("info", "Completed")
+
+        return document
 
     def _cleanup_tempdir(self, d):
         self.log("debug", "Deleting directory {}".format(d))
@@ -384,6 +349,12 @@ class Consumer(object):
 
         return False
 
+    @staticmethod
+    def _is_duplicate(doc):
+        with open(doc, "rb") as f:
+            checksum = hashlib.md5(f.read()).hexdigest()
+        return Document.objects.filter(checksum=checksum).exists()
+
 
 def image_to_string(args):
     img, lang = args
@@ -400,6 +371,16 @@ def image_to_string(args):
 
 def run_unpaper(args):
     unpaper, pnm = args
-    subprocess.Popen((
-        unpaper, pnm, pnm.replace(".pnm", ".unpaper.pnm")
-    )).wait()
+    subprocess.Popen(
+        (unpaper, pnm, pnm.replace(".pnm", ".unpaper.pnm"))).wait()
+
+
+def run_convert(*args):
+
+    environment = {}
+    if settings.CONVERT_MEMORY_LIMIT:
+        environment["MAGICK_MEMORY_LIMIT"] = settings.CONVERT_MEMORY_LIMIT
+    if settings.CONVERT_TMPDIR:
+        environment["MAGICK_TMPDIR"] = settings.CONVERT_TMPDIR
+
+    subprocess.Popen(args, env=environment).wait()
